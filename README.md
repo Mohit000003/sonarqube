@@ -53,7 +53,7 @@ Edit
 sudo -i -u postgres
 Run the following PostgreSQL commands:
 
-sql
+psql
 Copy
 Edit
 CREATE USER sonar WITH ENCRYPTED PASSWORD 'sonar';
@@ -61,7 +61,7 @@ CREATE DATABASE sonarqube OWNER sonar;
 ALTER USER sonar WITH SUPERUSER;
 Exit PostgreSQL:
 
-sh
+\q
 Copy
 Edit
 exit
