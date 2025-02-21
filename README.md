@@ -1,235 +1,220 @@
-# sonarqube
+Step 1: Install Required Dependencies
+Update system packages and install OpenJDK, unzip, and required utilities:
 
-How to Install SonarQube on Ubuntu 22.04 (Step-by-Step Guide)
-This guide will help you install and run SonarQube on Ubuntu 22.04, accessible on http://localhost:9000.
-
-Step 1: Update the System
-Before installing SonarQube, update and upgrade your system packages:
-
-sh
+bash
 Copy
 Edit
-sudo apt update && sudo apt upgrade -y
-Step 2: Install Java 17 (Required for SonarQube)
-SonarQube requires Java 17, so install OpenJDK 17:
+sudo apt update -y
+sudo apt install -y openjdk-17-jdk unzip
+Step 2: Install PostgreSQL
+Add PostgreSQL repository:
 
-sh
+bash
 Copy
 Edit
-sudo apt install openjdk-17-jdk -y
-Check Java version:
+echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+Import PostgreSQL signing key:
 
-sh
+bash
 Copy
 Edit
-java -version
-Expected output:
+wget -qO - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+Update package lists and install PostgreSQL:
 
-nginx
+bash
 Copy
 Edit
-openjdk version "17.0.x"
-Step 3: Install PostgreSQL (Required for Production)
-SonarQube recommends using PostgreSQL 12+ as its database.
-Install PostgreSQL:
-
-sh
-Copy
-Edit
-sudo apt install postgresql postgresql-contrib -y
+sudo apt update -y
+sudo apt install -y postgresql-15
 Start and enable PostgreSQL service:
 
-sh
+bash
 Copy
 Edit
-sudo systemctl start postgresql
 sudo systemctl enable postgresql
-Create a Database for SonarQube
+sudo systemctl start postgresql
+Step 3: Configure PostgreSQL for SonarQube
 Switch to the PostgreSQL user:
 
-sh
+bash
 Copy
 Edit
 sudo -i -u postgres
-Run the following PostgreSQL commands:
+Create a SonarQube database user with a password:
 
-psql
+bash
 Copy
 Edit
-CREATE USER sonar WITH ENCRYPTED PASSWORD 'sonar';
-CREATE DATABASE sonarqube OWNER sonar;
-ALTER USER sonar WITH SUPERUSER;
+createuser sonar
+psql -c "ALTER USER sonar WITH ENCRYPTED PASSWORD 'Password';"
+Create the SonarQube database and grant privileges:
+
+bash
+Copy
+Edit
+createdb -O sonar sonarqube
 Exit PostgreSQL:
 
-\q
+bash
 Copy
 Edit
 exit
-Step 4: Create a Dedicated SonarQube User
-Create a system user to run SonarQube:
+Step 4: Install SonarQube
+Download SonarQube:
 
-sh
+bash
 Copy
 Edit
-sudo adduser --system --no-create-home --group sonar
-Step 5: Download and Extract SonarQube
-Navigate to the /opt directory:
+wget https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-9.6.1.59531.zip
+Extract SonarQube:
 
-sh
+bash
 Copy
 Edit
-cd /opt
-Download the latest SonarQube Community Edition:
+unzip sonarqube-9.6.1.59531.zip
+Move SonarQube to /opt:
 
-sh
+bash
 Copy
 Edit
-sudo wget https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-9.9.1.69595.zip
-(Replace the version number with the latest one from SonarQube Downloads)
+sudo mv sonarqube-9.6.1.59531 /opt/sonarqube
+Step 5: Create a SonarQube User
+Create a new system user:
 
-Install unzip (if not installed)
-sh
+bash
 Copy
 Edit
-sudo apt install unzip -y
-Extract SonarQube
-sh
-Copy
-Edit
-sudo unzip sonarqube-9.9.1.69595.zip
-Rename the extracted folder:
+sudo useradd -m -d /opt/sonarqube -r -s /bin/bash sonarqube
+Change ownership of SonarQube files:
 
-sh
+bash
 Copy
 Edit
-sudo mv sonarqube-9.9.1.69595 sonarqube
-Change ownership to the sonar user:
-
-sh
-Copy
-Edit
-sudo chown -R sonar:sonar /opt/sonarqube
+sudo chown -R sonarqube:sonarqube /opt/sonarqube
+sudo chmod -R 775 /opt/sonarqube
 Step 6: Configure SonarQube
-Edit the SonarQube configuration file:
+Open the SonarQube configuration file:
 
-sh
+bash
 Copy
 Edit
 sudo nano /opt/sonarqube/conf/sonar.properties
-Find and update the database settings:
+Modify the database settings:
 
 ini
 Copy
 Edit
 sonar.jdbc.username=sonar
-sonar.jdbc.password=sonar
+sonar.jdbc.password=Password
 sonar.jdbc.url=jdbc:postgresql://localhost:5432/sonarqube
-sonar.web.host=0.0.0.0
+Modify the SonarQube web server port (optional, default is 9000):
+
+ini
+Copy
+Edit
 sonar.web.port=9000
 Save the file (CTRL + X, then Y, then ENTER).
 
 Step 7: Create a Systemd Service for SonarQube
 Create a new systemd service file:
 
-sh
+bash
 Copy
 Edit
 sudo nano /etc/systemd/system/sonarqube.service
-Paste the following content:
+Add the following content:
 
 ini
 Copy
 Edit
 [Unit]
 Description=SonarQube service
-After=syslog.target network.target
+After=network.target postgresql.service
 
 [Service]
-Type=simple
-ExecStart=/opt/sonarqube/bin/linux-x86-64/sonar.sh console
-User=sonar
-Group=sonar
+Type=forking
+User=sonarqube
+Group=sonarqube
+ExecStart=/opt/sonarqube/bin/linux-x86-64/sonar.sh start
+ExecStop=/opt/sonarqube/bin/linux-x86-64/sonar.sh stop
 Restart=always
 LimitNOFILE=65536
 
 [Install]
 WantedBy=multi-user.target
-Save and exit (CTRL + X, then Y, then ENTER).
+Save the file (CTRL + X, then Y, then ENTER).
 
-Reload systemd and start SonarQube:
-
-sh
-Copy
-Edit
-sudo systemctl daemon-reload
-sudo systemctl enable sonarqube
-sudo systemctl start sonarqube
-Check the status:
-
-sh
-Copy
-Edit
-sudo systemctl status sonarqube
-You should see Active: running.
-
-Step 8: Allow Port 9000 in the Firewall
-If you have UFW (Uncomplicated Firewall) enabled, allow port 9000:
-
-sh
-Copy
-Edit
-sudo ufw allow 9000/tcp
-sudo ufw reload
-Step 9: Access SonarQube
-Now, open your browser and go to:
-👉 http://localhost:9000
-
-Login with the default credentials:
-
-Username: admin
-Password: admin
-After logging in, you will be prompted to change the password.
-
-Step 10: Troubleshooting (If SonarQube Fails to Start)
-Check SonarQube Logs
-If SonarQube doesn’t start, check the logs:
-
-sh
-Copy
-Edit
-sudo journalctl -u sonarqube -f
-Increase System Limits (If Needed)
-Run the following command:
-
-sh
-Copy
-Edit
-echo "sonar - nofile 65536" | sudo tee -a /etc/security/limits.conf
-Check Java Version
-Make sure you are using Java 17:
-
-sh
-Copy
-Edit
-java -version
-SonarQube Directory Structure
-After installation, your SonarQube directory should look like this:
+Reload systemd and enable the SonarQube service:
 
 bash
 Copy
 Edit
-/opt/sonarqube
-│-- bin/                  # Startup scripts for different OS
-│   ├── linux-x86-64/     # Linux-specific startup script
-│   ├── macosx-universal/ # MacOS-specific startup script
-│   ├── windows-x86-64/   # Windows-specific startup script
-│-- conf/                 # Configuration files (sonar.properties, wrapper.conf)
-│-- data/                 # SonarQube data (indexes, settings, etc.)
-│-- elasticsearch/        # Embedded Elasticsearch for search
-│-- extensions/           # Plugins and additional functionalities
-│-- lib/                  # Libraries
-│-- logs/                 # Logs generated by SonarQube
-│-- temp/                 # Temporary files
-🎉 SonarQube is Now Installed and Running on Ubuntu 22.04!
-👉 Access it via: http://localhost:9000
-Let me know if you face any issues! 🚀
+sudo systemctl daemon-reload
+sudo systemctl enable sonarqube
+Start SonarQube:
+
+bash
+Copy
+Edit
+sudo systemctl start sonarqube
+Step 8: Access SonarQube Web Interface
+Open a browser and go to:
+
+cpp
+Copy
+Edit
+http://<your-server-ip>:9000
+Login with default credentials:
+
+pgsql
+Copy
+Edit
+Username: admin
+Password: admin
+Change the default password after logging in.
+
+Step 9: Check SonarQube Logs (if needed)
+To verify if SonarQube is running properly:
+
+bash
+Copy
+Edit
+sudo journalctl -u sonarqube -f
+Step 10: (Optional) Open Firewall Port
+If UFW is enabled, allow port 9000:
+
+bash
+Copy
+Edit
+sudo ufw allow 9000/tcp
+sudo ufw reload
+Conclusion
+You have successfully installed and configured SonarQube on Ubuntu without Ansible. 🎉
+
+Would you like a script to automate this manual process? 🚀
+
+
+
+Better Alternative: Modify Instead of Append
+If you want to modify existing values instead of just adding duplicates, use sed:
+
+bash
+Copy
+Edit
+sudo sed -i 's/^sonar.jdbc.username=.*/sonar.jdbc.username=sonar/' /opt/sonarqube/conf/sonar.properties
+sudo sed -i 's/^sonar.jdbc.password=.*/sonar.jdbc.password=Password/' /opt/sonarqube/conf/sonar.properties
+sudo sed -i 's|^sonar.jdbc.url=.*|sonar.jdbc.url=jdbc:postgresql://localhost:5432/sonarqube|' /opt/sonarqube/conf/sonar.properties
+sudo sed -i 's/^sonar.web.port=.*/sonar.web.port=9000/' /opt/sonarqube/conf/sonar.properties
+This approach ensures existing values are replaced, avoiding duplicates.
+
+Let me know which method you prefer! 🚀
+
+3️⃣ Check Database Connection from SonarQube
+Run this inside psql to check if SonarQube has created tables:
+
+bash
+Copy
+Edit
+sudo -u postgres psql -d sonarqube -c "\dt"
+✅ If you see a list of tables, SonarQube is connected to PostgreSQL.
+❌ If empty, SonarQube is not connected.
