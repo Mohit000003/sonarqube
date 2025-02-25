@@ -205,6 +205,8 @@ sudo sed -i 's/^sonar.jdbc.username=.*/sonar.jdbc.username=sonar/' /opt/sonarqub
 sudo sed -i 's/^sonar.jdbc.password=.*/sonar.jdbc.password=Password/' /opt/sonarqube/conf/sonar.properties
 sudo sed -i 's|^sonar.jdbc.url=.*|sonar.jdbc.url=jdbc:postgresql://localhost:5432/sonarqube|' /opt/sonarqube/conf/sonar.properties
 sudo sed -i 's/^sonar.web.port=.*/sonar.web.port=9000/' /opt/sonarqube/conf/sonar.properties
+sudo sed -i '/^sonar.web.host=/d' /opt/sonarqube/conf/sonar.properties
+echo "sonar.web.host=0.0.0.0" | sudo tee -a /opt/sonarqube/conf/sonar.properties > /dev/null
 This approach ensures existing values are replaced, avoiding duplicates.
 
 Let me know which method you prefer! 🚀
